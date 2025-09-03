@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>QKD Packet-Tracer Style Simulator — BB84</title>
+<style>
+:root{
+  --bg1:#051025; --bg2:#071226;
+  --accent1:#06b6d4; --accent2:#8b5cf6; --danger:#ef4444;
+  --glass: rgba(255,255,255,0.03);
+}
+*{box-sizing:border-box;font-family:Inter,Segoe UI,system-ui,Arial,sans-serif}
+html,body{height:100%;margin:0;background:
+  radial-gradient(900px 400px at 10% 12%, rgba(139,92,246,0.03), transparent),
+  linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%); color:#e9f7ff}
+
+.app {display:flex;min-height:100vh}
+
+/* Sidebar */
+.sidebar{
+  width:300px;padding:18px;border-right:1px solid rgba(255,255,255,0.02);
+  background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+}
+.header {display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.header h1{font-size:18px;margin:0}
+.toolbox .tool {background:var(--glass);padding:10px;border-radius:10px;margin-bottom:10px;cursor:grab;border:1px solid rgba(255,255,255,0.03);display:flex;gap:10px;align-items:center}
+.tool .emoji{width:46px;height:46px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#fff}
+
+/* Main */
+.canvas-wrap{flex:1;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 18px}
+.topbar .title{font-weight:700}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* workspace / stage */
+.stage{flex:1;margin:12px;border-radius:12px;padding:12px;position:relative;overflow:hidden}
+.workspace{position:relative;height:68vh;border-radius:10px;background:
+  radial-gradient(800px 300px at 20% 10%, rgba(124,58,237,0.02), transparent),
+  linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));}
+
+/* svg cable */
+.workspace svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+
+/* nodes */
+.node{position:absolute;width:120px;height:120px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:grab;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 30px rgba(0,0,0,0.45)}
+.node .avatar{width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;background:linear-gradient(135deg,var(--accent1),var(--accent2));border:3px solid rgba(255,255,255,0.04)}
+#node-eve .avatar{background:linear-gradient(135deg,#ef4444,#fb923c)}
+.node .label{margin-top:8px;font-weight:700;color:#eaf8ff;text-transform:uppercase;letter-spacing:0.6px}
+
+/* panels under workspace */
+.side-panels{display:flex;gap:12px;margin-top:12px}
+.panel{background:var(--glass);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);flex:1}
+.panel h3{margin:0 0 8px 0}
+.qubit-row{display:flex;gap:8px;flex-wrap:wrap}
+.qubit-picker{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;min-width:110px}
+.btn{padding:8px 12px;border-radius:8px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#fff;border:none;cursor:pointer;font-weight:700}
+.btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#dff1ff}
+
+/* photon */
+.photon{position:absolute;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fff3c4,#ffd24d);color:#111;font-weight:800;border:2px solid rgba(0,0,0,0.12);box-shadow:0 10px 26px rgba(255,200,80,0.12)}
+.photon .basis{position:absolute;top:-14px;font-size:12px;color:rgba(0,0,0,0.6)}
+
+/* key display */
+.final-key{margin-top:12px;padding:12px;border-radius:12px;background:linear-gradient(90deg,#ffd54d,#ffb86b);color:#111;font-weight:800;display:inline-block;box-shadow:0 12px 40px rgba(255,150,50,0.12)}
+
+/* modal */
+.modal-back{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:9999}
+.modal{width:92%;max-width:900px;background:linear-gradient(180deg,#083046,#062438);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);color:#e5f6ff;max-height:86vh;overflow:auto}
+h2{margin-top:0}
+
+/* speech */
+.speech{position:absolute;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,0.55);color:white;font-size:13px;max-width:300px;opacity:0;transform:translateY(6px);transition:all .36s}
+.speech.show{opacity:1;transform:translateY(0)}
+.speech.alice{left:18px;top:8px;background:linear-gradient(90deg,var(--accent1),var(--accent2))}
+.speech.bob{right:18px;top:8px;background:linear-gradient(90deg,#10b981,#06b6d4)}
+.speech.eve{left:50%;transform:translateX(-50%);top:8px;background:linear-gradient(90deg,#ef4444,#fb923c)}
+
+/* small note */
+.note{font-size:13px;color:#bfe8ff;margin-top:8px}
+
+/* responsive */
+@media(max-width:1000px){
+  .sidebar{display:none}
+  .workspace{height:60vh}
+  .side-panels{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- LEFT: TOOLBOX -->
+  <aside class="sidebar">
+    <div class="header"><h1>🔐 QKD Simulator</h1></div>
+
+    <div class="toolbox">
+      <div class="small">Drag components to the canvas (or click Fiber then nodes to connect)</div>
+
+      <div id="toolAlice" class="tool" draggable="true" data-tool="alice">
+        <div class="emoji">👩</div>
+        <div><div style="font-weight:700">Alice</div><div class="small">Sender</div></div>
+      </div>
+
+      <div id="toolBob" class="tool" draggable="true" data-tool="bob">
+        <div class="emoji">🧑</div>
+        <div><div style="font-weight:700">Bob</div><div class="small">Receiver</div></div>
+      </div>
+
+      <div id="toolEve" class="tool" draggable="true" data-tool="eve">
+        <div class="emoji">🕵️</div>
+        <div><div style="font-weight:700">Eve</div><div class="small">Eavesdropper</div></div>
+      </div>
+
+      <div id="toolFiber" class="tool" draggable="true" data-tool="fiber">
+        <div class="emoji">🔗</div>
+        <div><div style="font-weight:700">Fiber</div><div class="small">Click node A → node B</div></div>
+      </div>
+
+      <div id="toolMsg" class="tool" draggable="true" data-tool="message">
+        <div class="emoji">✉️</div>
+        <div><div style="font-weight:700">Message</div><div class="small">Visual message packet</div></div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="toggleEve" checked />
+        <label for="toggleEve" class="small">Enable Eve</label>
+      </div>
+
+      <div style="margin-top:14px">
+        <button id="howBtn" class="btn secondary" style="width:100%">How it works</button>
+      </div>
+
+      <div class="note">
+        <strong>Quick steps</strong>
+        <ol style="padding-left:18px;margin-top:6px">
+          <li>Drag Alice & Bob to the canvas</li>
+          <li>Drag Fiber then click Alice → Bob to connect</li>
+          <li>Place Eve on or near the fiber to intercept</li>
+          <li>Prepare bits/bases, Send Qubits, Measure, Sift, Encrypt</li>
+        </ol>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER: CANVAS -->
+  <div class="canvas-wrap">
+    <div class="topbar">
+      <div class="title">Packet-Tracer Style QKD — BB84</div>
+      <div class="right"><div class="small">Drag components → connect → simulate</div></div>
+    </div>
+
+    <div class="stage">
+      <div id="workspace" class="workspace">
+        <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+
+        <!-- speech bubbles -->
+        <div id="speechAlice" class="speech alice">Place Alice</div>
+        <div id="speechBob" class="speech bob">Place Bob</div>
+        <div id="speechEve" class="speech eve">Place Eve</div>
+      </div>
+
+      <div style="margin:20px; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px;">
+        <h3>⚛️ IBM Quantum Experiments</h3>
+        <button onclick="runExp1()">Run Experiment 1</button>
+        <button onclick="runExp2()" class="secondary">Run Experiment 2</button>
+
+        <pre id="output" style="margin-top:12px; background:rgba(0,0,0,0.4); padding:10px; border-radius:8px; color:#bfe8ff; max-height:250px; overflow:auto;"></pre>
+      </div>
+
+      <!-- control panels -->
+      <div class="side-panels">
+        <div class="panel">
+          <h3>1) Alice — bits & bases</h3>
+          <div class="small">Number of qubits, choose bits & bases (or randomize)</div>
+          <div style="margin-top:8px">
+            <label class="small">Count:
+              <select id="numQ" style="margin-left:8px">
+                <option>6</option><option selected>8</option><option>10</option><option>12</option>
+              </select>
+            </label>
+            <button id="randBtn" class="btn secondary" style="margin-left:8px">Randomize</button>
+          </div>
+          <div id="alicePickers" class="qubit-row" style="margin-top:10px"></div>
+          <div style="margin-top:10px">
+            <button id="prepareBtn" class="btn">Prepare</button>
+            <button id="sendBtn" class="btn secondary">Send Qubits</button>
+          </div>
+          <div id="aliceNote" class="note"></div>
+        </div>
+
+        <div class="panel">
+          <h3>2) Bob — measure</h3>
+          <div class="small">After photons arrive, measure each qubit</div>
+          <div id="bobArea" style="margin-top:8px"></div>
+          <div style="margin-top:8px">
+            <button id="siftBtn" class="btn secondary">Sift & Reveal Key</button>
+          </div>
+          <div id="mismatchInfo" class="note"></div>
+        </div>
+
+        <div class="panel">
+          <h3>3) Encrypt & Send</h3>
+          <div class="small">After key is ready, encrypt a message and send</div>
+          <input id="plaintext" placeholder="Message to encrypt" style="width:100%;margin-top:8px;padding:8px;border-radius:6px;border:none;background:rgba(255,255,255,0.02)"/>
+          <div style="margin-top:8px">
+            <button id="encryptBtn" class="btn" disabled>Encrypt & Send</button>
+          </div>
+          <div id="cipherBox" class="note" style="margin-top:8px;display:none"></div>
+          <div id="sharedKeyBox" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- How it works modal -->
+<div id="modal" class="modal-back" role="dialog" aria-hidden="true">
+  <div class="modal">
+    <h2>How BB84 QKD works — short & visual</h2>
+    <h3>Bits vs Bases</h3>
+    <p><strong>Bits</strong> are binary values 0 and 1. <br>
+       <strong>Bases</strong> are how we encode bits into photon polarization:
+       <ul>
+         <li><strong>+</strong> rectilinear (vertical/horizontal) — think | = 0, — = 1</li>
+         <li><strong>×</strong> diagonal (/ and \) — think / = 0, \ = 1</li>
+       </ul>
+    </p>
+    <h3>Protocol Steps (this simulator)</h3>
+    <ol>
+      <li>Alice prepares qubits: each qubit = (bit, basis) and sends photons over the fiber.</li>
+      <li>Bob measures each photon with a random basis. If his basis = Alice's basis → correct bit; else random.</li>
+      <li>Alice & Bob publicly compare bases (not bits) and keep positions with matching bases → sifted key.</li>
+      <li>If Eve intercepts and resends, she introduces errors in matched positions — detectable by Alice/Bob.</li>
+      <li>The sifted key is used to derive an encryption key (this demo uses a SHA-256 → AES-GCM approach for clarity).</li>
+    </ol>
+    <div style="text-align:right;margin-top:12px"><button id="closeModal" class="btn">Close</button></div>
+  </div>
+</div>
+
+<script>
+/* -----------------------
+   Complete QKD Simulator Script
+   ----------------------- */
+
+/* Globals & state */
+const workspace = document.getElementById('workspace');
+const svg = document.getElementById('svg');
+let nodes = [];    // {id,type,el,x,y}
+let cables = [];   // {id,fromId,toId,path}
+let nextId = 1;
+let connectMode = false;
+let connectStart = null;
+let dragging = null;
+let dragOffset = {x:0,y:0};
+
+let aliceBits = [], aliceBases = [], bobChoices = [], bobResults = [], perPhotonEve = [];
+let photonsInFlight = 0;
+let derivedKey = null;
+
+/* UI refs */
+const speechAlice = document.getElementById('speechAlice');
+const speechBob   = document.getElementById('speechBob');
+const speechEve   = document.getElementById('speechEve');
+
+function $(id){ return document.getElementById(id); }
+function randBit(){ return Math.random() < 0.5 ? 0 : 1 }
+function randBasis(){ return Math.random() < 0.5 ? '+' : 'x' }
+
+/* show bubble */
+function showBubble(who,text){
+  const el = who==='Alice' ? speechAlice : who==='Bob' ? speechBob : speechEve;
+  el.innerText = text; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+/* TOOL: make toolbox items draggable onto workspace */
+['toolAlice','toolBob','toolEve','toolFiber','toolMsg'].forEach(id=>{
+  const t = document.getElementById(id);
+  t.addEventListener('dragstart', e => { e.dataTransfer.setData('tool', id); });
+});
+
+/* workspace drag/drop */
+workspace.addEventListener('dragover', e=> e.preventDefault());
+workspace.addEventListener('drop', e=>{
+  e.preventDefault();
+  const tool = e.dataTransfer.getData('tool');
+  if (!tool) return;
+  const rect = workspace.getBoundingClientRect();
+  const x = e.clientX - rect.left - 60;
+  const y = e.clientY - rect.top - 60;
+  if (tool === 'toolFiber'){
+    connectMode = true; connectStart = null;
+    showBubble('Alice','Connect mode: click node A then node B to create fiber');
+    return;
+  }
+  if (tool === 'toolAlice') createNode('alice', x, y);
+  if (tool === 'toolBob')   createNode('bob',   x, y);
+  if (tool === 'toolEve')   createNode('eve',   x, y);
+  if (tool === 'toolMsg')   createNode('message', x, y);
+});
+
+/* create node */
+function createNode(type,x=120,y=80){
+  const id = 'n' + (nextId++);
+  const el = document.createElement('div'); el.className='node'; el.id='node-'+id;
+  el.dataset.id = id; el.dataset.type = type;
+  el.style.left = x+'px'; el.style.top = y+'px';
+  const emoji = type==='alice' ? '👩' : type==='bob' ? '🧑' : type==='eve' ? '🕵️' : '✉️';
+  el.innerHTML = `<div class="avatar">${emoji}</div><div class="label">${type.toUpperCase()}</div>`;
+  workspace.appendChild(el);
+  nodes.push({id,type,el,x,y});
+  makeDraggable(el);
+  el.addEventListener('click', ev => { ev.stopPropagation(); nodeClicked(id); });
+  renderCables();
+}
+
+/* draggable nodes (pointer-based) */
+function makeDraggable(el){
+  el.addEventListener('pointerdown', e=>{
+    dragging = el; el.setPointerCapture(e.pointerId);
+    const crect = workspace.getBoundingClientRect();
+    dragOffset.x = e.clientX - crect.left - parseFloat(el.style.left);
+    dragOffset.y = e.clientY - crect.top  - parseFloat(el.style.top);
+    el.style.cursor='grabbing';
+  });
+}
+window.addEventListener('pointermove', e=>{
+  if (!dragging) return;
+  const crect = workspace.getBoundingClientRect();
+  let nx = e.clientX - crect.left - dragOffset.x;
+  let ny = e.clientY - crect.top - dragOffset.y;
+  nx = Math.max(6, Math.min(nx, crect.width - 126));
+  ny = Math.max(6, Math.min(ny, crect.height - 126));
+  dragging.style.left = nx + 'px'; dragging.style.top = ny + 'px';
+  const id = dragging.dataset.id; const nd = nodes.find(n=>n.id===id); if (nd){ nd.x = nx; nd.y = ny; renderCables(); }
+});
+window.addEventListener('pointerup', e=>{ if (dragging){ dragging.style.cursor='grab'; dragging.releasePointerCapture(e.pointerId); dragging=null; } });
+
+/* node click: for connect mode or normal select */
+function nodeClicked(id){
+  if (connectMode){
+    if (!connectStart){ connectStart = id; const nd = nodes.find(n=>n.id===id); nd.el.style.outline='2px solid rgba(14,165,233,0.9)'; showBubble('Alice','Now click the node to connect to'); return; }
+    if (connectStart === id){ showBubble('Alice','Cannot connect node to itself'); connectStart=null; connectMode=false; cleanupOutlines(); return; }
+    createCable(connectStart, id);
+    connectMode = false; cleanupOutlines();
+    showBubble('Alice','Fiber connected');
+    return;
+  }
+  const nd = nodes.find(n=>n.id===id);
+  if (nd) showBubble(nd.type==='alice'?'Alice':nd.type==='bob'?'Bob':'Eve', `${nd.type.toUpperCase()} selected`);
+}
+function cleanupOutlines(){ nodes.forEach(n=> n.el.style.outline='none'); }
+
+/* create cable between two nodes (SVG path) */
+function createCable(fromId,toId){
+  if (cables.some(c=> (c.fromId===fromId && c.toId===toId) || (c.fromId===toId && c.toId===fromId) )) return;
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('stroke','rgba(6,182,212,0.9)');
+  path.setAttribute('stroke-width','6');
+  path.setAttribute('fill','none'); path.setAttribute('stroke-linecap','round');
+  svg.appendChild(path);
+  cables.push({id:'c'+(cables.length+1), fromId, toId, path});
+  renderCables();
+}
+
+/* render all cables */
+function renderCables(){
+  // ensure defs for gradient maybe
+  ensureDefs();
+  cables.forEach(c=>{
+    const a = nodes.find(n=>n.id===c.fromId); const b = nodes.find(n=>n.id===c.toId);
+    if (!a || !b) return;
+    const ax = a.x + 60, ay = a.y + 60, bx = b.x + 60, by = b.y + 60;
+    const dx = bx-ax;
+    const cp1x = ax + dx*0.25, cp1y = ay - 80;
+    const cp2x = ax + dx*0.75, cp2y = by - 80;
+    const d = `M ${ax} ${ay} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${bx} ${by}`;
+    c.path.setAttribute('d', d);
+    // if Eve is near the path and enabled, color red
+    const eveNode = nodes.find(n=>n.type==='eve');
+    if (eveNode && toggleEve.checked){
+      if (isNodeNearPath(eveNode, c.path)) c.path.setAttribute('stroke', 'rgba(239,68,68,0.9)');
+      else c.path.setAttribute('stroke', 'rgba(6,182,212,0.9)');
+    } else c.path.setAttribute('stroke', 'rgba(6,182,212,0.9)');
+  });
+}
+
+/* small SVG defs */
+function ensureDefs(){
+  if (svg.querySelector('defs')) return;
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const grad = document.createElementNS('http://www.w3.org/2000/svg','linearGradient'); grad.id='g1'; grad.setAttribute('x1','0%'); grad.setAttribute('x2','100%');
+  const s1 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s1.setAttribute('offset','0%'); s1.setAttribute('stop-color','#06b6d4');
+  const s2 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s2.setAttribute('offset','100%'); s2.setAttribute('stop-color','#8b5cf6');
+  grad.appendChild(s1); grad.appendChild(s2);
+  defs.appendChild(grad); svg.appendChild(defs);
+}
+
+/* detect if a node center is near a path's bbox approx */
+function isNodeNearPath(node, pathEl){
+  const bbox = pathEl.getBBox();
+  const nx = node.x + 60, ny = node.y + 60;
+  return nx > bbox.x - 30 && nx < bbox.x + bbox.width + 30 && ny > bbox.y - 30 && ny < bbox.y + bbox.height + 30;
+}
+
+/* -------------------------
+   Alice UI: pickers
+   ------------------------- */
+function buildAlicePickers(){
+  const n = parseInt($('numQ').value,10);
+  aliceBits = new Array(n).fill(0);
+  aliceBases = new Array(n).fill('+');
+  perPhotonEve = new Array(n).fill(null);
+  bobChoices = new Array(n).fill(null);
+  bobResults = new Array(n).fill(null);
+  const container = $('alicePickers'); container.innerHTML='';
+  for (let i=0;i<n;i++){
+    const div = document.createElement('div'); div.className='qubit-picker';
+    div.innerHTML = `<div style="font-weight:700">Q${i+1}</div>
+      <label class="small">Bit</label>
+      <select id="abit-${i}"><option value="0">0</option><option value="1">1</option></select>
+      <label class="small" style="margin-top:6px">Basis</label>
+      <select id="abase-${i}"><option value="+">+</option><option value="x">x</option></select>`;
+    container.appendChild(div);
+  }
+  $('bobArea').innerHTML=''; $('cipherBox').style.display='none'; $('sharedKeyBox').innerHTML=''; $('mismatchInfo').innerText='';
+  $('encryptBtn').disabled = true;
+  $('aliceNote').innerText = 'Prepared — set bits & bases or Randomize.';
+}
+$('prepareBtn').addEventListener('click', buildAlicePickers);
+$('numQ').addEventListener('change', buildAlicePickers);
+$('randBtn').addEventListener('click', ()=>{
+  buildAlicePickers();
+  const n = parseInt($('numQ').value,10);
+  for (let i=0;i<n;i++){ $('abit-'+i).value = randBit(); $('abase-'+i).value = randBasis(); }
+});
+
+/* -------------------------
+   Send photons (animated along path)
+   ------------------------- */
+$('sendBtn').addEventListener('click', ()=>{
+  const alice = nodes.find(n=>n.type==='alice'), bob = nodes.find(n=>n.type==='bob');
+  if (!alice || !bob){ alert('Place Alice and Bob on the canvas'); return; }
+  const route = findRoute(alice, bob);
+  if (!route){ alert('Connect Alice and Bob using Fiber (or connect via Eve)'); return; }
+  // read inputs
+  const n = parseInt($('numQ').value,10);
+  aliceBits = new Array(n); aliceBases = new Array(n);
+  for (let i=0;i<n;i++){ aliceBits[i] = parseInt($('abit-'+i).value,10); aliceBases[i] = $('abase-'+i).value; }
+  bobChoices = new Array(n).fill(null); bobResults = new Array(n).fill(null); perPhotonEve = new Array(n).fill(null);
+  photonsInFlight = n;
+  $('bobArea').innerHTML=''; $('cipherBox').style.display='none'; $('sharedKeyBox').innerHTML=''; $('mismatchInfo').innerText='';
+  showBubble('Alice','Sending photons...');
+  const delay = 140;
+  for (let i=0;i<n;i++){ ((idx)=> setTimeout(()=> sendPhoton(idx, route), idx*delay))(i); }
+});
+
+/* find route array of nodes between Alice and Bob (uses cables if present) */
+function findRoute(alice,bob){
+  // direct cable?
+  const direct = cables.find(c=> (c.fromId===alice.id && c.toId===bob.id) || (c.fromId===bob.id && c.toId===alice.id));
+  if (direct) return [alice,bob];
+  // via Eve if connected both sides and enabled
+  const eve = nodes.find(n=>n.type==='eve');
+  if (eve && $('toggleEve').checked){
+    const c1 = cables.find(c=> (c.fromId===alice.id && c.toId===eve.id) || (c.fromId===eve.id && c.toId===alice.id));
+    const c2 = cables.find(c=> (c.fromId===bob.id && c.toId===eve.id) || (c.fromId===eve.id && c.toId===bob.id));
+    if (c1 && c2) return [alice,eve,bob];
+  }
+  // BFS on cable graph
+  const graph = {};
+  nodes.forEach(n=> graph[n.id]=[]);
+  cables.forEach(c=> { graph[c.fromId].push(c.toId); graph[c.toId].push(c.fromId); });
+  const q = [[alice.id]]; const visited = new Set([alice.id]);
+  while(q.length){
+    const path = q.shift(), last = path[path.length-1];
+    if (last === bob.id) return path.map(id=> nodes.find(n=>n.id===id));
+    for (const nb of graph[last] || []) if (!visited.has(nb)) { visited.add(nb); q.push([...path, nb]); }
+  }
+  return null;
+}
+
+/* send single photon along route: animate along the SVG path that connects appropriate two nodes per segment */
+function sendPhoton(index, route){
+  // build a combined path for route: concat cubic segments between consecutive nodes by looking up cable path
+  const segmentPaths = [];
+  for (let i=0;i<route.length-1;i++){
+    const from = route[i], to = route[i+1];
+    // find cable between them
+    const cable = cables.find(c=> (c.fromId===from.id && c.toId===to.id) || (c.fromId===to.id && c.toId===from.id));
+    if (!cable) { console.warn('No cable for segment', from,to); return; }
+    segmentPaths.push(cable.path);
+  }
+  if (segmentPaths.length===0) return;
+
+  // create photon element
+  const p = document.createElement('div'); p.className='photon';
+  const badge = document.createElement('div'); badge.className='basis'; badge.textContent = aliceBases[index];
+  p.appendChild(badge);
+  document.body.appendChild(p);
+
+  // animate along piecewise paths sequentially using getPointAtLength
+  let segIndex = 0;
+  function animateAlongPath(seg){
+    const path = seg;
+    const len = path.getTotalLength();
+    const duration = 420 + Math.random()*300;
+    const start = performance.now();
+    function frame(now){
+      const t = Math.min(1,(now-start)/duration);
+      const pt = path.getPointAtLength(len * t);
+      p.style.left = (pt.x - 20) + 'px'; p.style.top = (pt.y - 20) + 'px';
+      if (t < 1) requestAnimationFrame(frame);
+      else {
+        // arrived at segment end (node)
+        const arrivedNodeId = (()=> {
+          const attr = path.getAttribute('d'); // can't easily get endpoint; instead infer based on segIndex
+          // we will rely on route array: when segmentPaths[segIndex] corresponds to route[segIndex] -> route[segIndex+1]
+          return route[segIndex+1].id;
+        })();
+        // if arrived at Eve node and Eve enabled, perform intercept-resend
+        const arrivedNode = nodes.find(n=> n.id === arrivedNodeId);
+        if (arrivedNode && arrivedNode.type === 'eve' && $('toggleEve').checked){
+          // Eve measures with random basis then determines resent bit
+          const eveBasis = randBasis();
+          const eveMeasured = (eveBasis === aliceBases[index]) ? aliceBits[index] : randBit();
+          perPhotonEve[index] = {eveBasis, resentBit: eveMeasured, intercepted:true};
+          showBubble('Eve', `Intercepted Q${index+1} — measured ${eveBasis}`);
+          placeTransient(arrivedNode, `E:${eveMeasured}`);
+          // remove badge (Eve hides basis)
+          if (badge) badge.remove();
+          // continue to next segment (photon now becomes the resent bit)
+          segIndex++;
+          if (segIndex < segmentPaths.length) animateAlongPath(segmentPaths[segIndex]);
+          else finishAtReceiver();
+        } else {
+          // normal node transit
+          segIndex++;
+          if (segIndex < segmentPaths.length) animateAlongPath(segmentPaths[segIndex]);
+          else finishAtReceiver();
+        }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finishAtReceiver(){
+    if (badge) badge.remove();
+    const txt = document.createElement('div'); txt.textContent = aliceBits[index];
+    p.appendChild(txt);
+    animateReceiverPulse(route[route.length-1]);
+    setTimeout(()=>{ p.remove(); photonsInFlight--; if (photonsInFlight===0) { showBubble('Bob','All photons arrived — measure them'); buildBobUI(); } }, 600);
+  }
+
+  // start animation on first path
+  animateAlongPath(segmentPaths[0]);
+}
+
+/* small transient marker near node */
+function placeTransient(node, text){
+  const rect = workspace.getBoundingClientRect();
+  const m = document.createElement('div'); m.className='qubit-picker'; m.style.position='absolute';
+  m.style.left = (rect.left + node.x + 30) + 'px'; m.style.top = (rect.top + node.y + 120) + 'px'; m.style.opacity=0.08;
+  m.style.background='rgba(255,255,255,0.02)'; m.innerHTML = `<div style="font-size:12px">${text}</div>`;
+  document.body.appendChild(m); setTimeout(()=>m.remove(),900);
+}
+
+/* receiver pulse */
+function animateReceiverPulse(node){
+  const r = workspace.getBoundingClientRect();
+  const cx = r.left + node.x + 60, cy = r.top + node.y + 60;
+  const pulse = document.createElement('div'); pulse.style.position='absolute'; pulse.style.left=(cx-35)+'px'; pulse.style.top=(cy-35)+'px';
+  pulse.style.width='70px'; pulse.style.height='70px'; pulse.style.borderRadius='50%'; pulse.style.background='radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 40%)';
+  document.body.appendChild(pulse);
+  pulse.animate([{transform:'scale(0)',opacity:1},{transform:'scale(1.05)',opacity:0.6},{transform:'scale(1.6)',opacity:0}],{duration:520,easing:'ease-out'});
+  setTimeout(()=>pulse.remove(),600);
+}
+
+/* -------------------------
+   Bob UI & measurement
+   ------------------------- */
+function buildBobUI(){
+  const area = $('bobArea'); area.innerHTML='';
+  for (let i=0;i<aliceBits.length;i++){
+    const card = document.createElement('div'); card.className='measure-card'; card.id='m-'+i; card.style.marginBottom='8px';
+    card.innerHTML = `<div style="font-weight:700">Q${i+1}</div>
+      <div class="small" style="margin-top:6px">Choose basis</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-top:6px">
+        <button class="btn secondary" onclick="userMeasure(${i}, '+')">+</button>
+        <button class="btn secondary" onclick="userMeasure(${i}, 'x')">x</button>
+      </div>
+      <div id="res-${i}" style="margin-top:6px">—</div>`;
+    area.appendChild(card);
+  }
+}
+
+/* measurement logic (uses perPhotonEve if intercepted) */
+function userMeasure(index, basis){
+  if (bobChoices[index] !== null) return;
+  bobChoices[index] = basis;
+  const eveRec = perPhotonEve[index];
+  if (eveRec && eveRec.intercepted){
+    if (basis === aliceBases[index]) bobResults[index] = eveRec.resentBit;
+    else bobResults[index] = randBit();
+  } else {
+    if (basis === aliceBases[index]) bobResults[index] = aliceBits[index];
+    else bobResults[index] = randBit();
+  }
+  $('res-'+index).innerText = `Basis ${basis} → Bit ${bobResults[index]}`;
+  showBubble('Bob', `Measured Q${index+1}`);
+}
+
+/* -------------------------
+   Sift & Key derivation
+   ------------------------- */
+$('siftBtn').addEventListener('click', async ()=>{
+  if (!aliceBits.length){ alert('No qubits sent yet'); return; }
+  if (bobChoices.some(v=> v===null)){ alert('Please measure all qubits before sifting'); return; }
+  const keyBits = [], mismatches = [];
+  for (let i=0;i<aliceBits.length;i++){
+    if (aliceBases[i] === bobChoices[i]){
+      keyBits.push(aliceBits[i]);
+      if (bobResults[i] !== aliceBits[i]) mismatches.push(i);
+    }
+  }
+  const keyBox = $('sharedKeyBox'); keyBox.innerHTML='';
+  if (keyBits.length === 0) keyBox.innerHTML = `<div class="final-key">No shared key (no matching bases)</div>`;
+  else {
+    keyBox.innerHTML = `<div class="final-key">🔑 ${keyBits.join('')}</div>`;
+    showBubble('Alice','Shared key established!');
+    derivedKey = await deriveAesKeyFromBits(keyBits);
+    $('encryptBtn').disabled = false;
+  }
+  const mi = $('mismatchInfo');
+  if (mismatches.length > 0){
+    mi.innerText = `Detected ${mismatches.length} mismatches — possible Eve interference`;
+    mi.style.color = '#ffb3b3';
+    mismatches.forEach(i=> { const el = $('m-'+i); if (el) el.style.border = '2px solid #ef4444'; });
+  } else { mi.innerText = 'No mismatches detected in matched positions'; mi.style.color = '#bfe8ff'; }
+});
+
+/* derive AES key from bits via SHA-256 (demo KDF) */
+async function deriveAesKeyFromBits(bits){
+  const encoder = new TextEncoder();
+  const h = await crypto.subtle.digest('SHA-256', encoder.encode(bits.join('')));
+  const keyBytes = h.slice(0,16);
+  return crypto.subtle.importKey('raw', keyBytes, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+}
+
+/* -------------------------
+   Encrypt & transmit ciphertext
+   ------------------------- */
+$('encryptBtn').addEventListener('click', async ()=>{
+  if (!derivedKey) { alert('No derived key; sift first'); return; }
+  const plaintext = $('plaintext').value || '';
+  if (!plaintext){ alert('Enter a plaintext to encrypt'); return; }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({name:'AES-GCM', iv}, derivedKey, new TextEncoder().encode(plaintext));
+  const hex = bufferToHex(ciphertext);
+  $('cipherBox').style.display='block'; $('cipherBox').innerHTML = `<div style="font-weight:700">Ciphertext (hex)</div><div style="margin-top:8px;font-family:monospace">${hex}</div>`;
+  // animate ciphertext along route (same route as qubits)
+  const alice = nodes.find(n=>n.type==='alice'), bob = nodes.find(n=>n.type==='bob');
+  const route = findRoute(alice,bob);
+  if (!route){ alert('No route between Alice and Bob'); return; }
+  animateCipher(route, hex, async ()=>{
+    try {
+      const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, derivedKey, ciphertext);
+      const plain = new TextDecoder().decode(decrypted);
+      $('cipherBox').innerHTML += `<div style="margin-top:8px"><strong>Bob decrypted:</strong> ${plain}</div>`; showBubble('Bob', `Decrypted: "${plain}"`);
+    } catch(e){
+      $('cipherBox').innerHTML += `<div style="margin-top:8px;color:#ffb3b3">Decryption error</div>`;
+    }
+  });
+});
+
+function bufferToHex(buf){
+  const a = new Uint8Array(buf); return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* animate ciphertext: move linearly from start node center to end center */
+function animateCipher(route, hex, onArrive){
+  const rect = workspace.getBoundingClientRect();
+  const start = {x: rect.left + route[0].x + 60 - 20, y: rect.top + route[0].y + 60 - 20};
+  const end   = {x: rect.left + route[route.length-1].x + 60 - 140, y: rect.top + route[route.length-1].y + 60 - 20};
+  const box = document.createElement('div'); box.className='photon'; box.style.width='160px'; box.style.height='44px'; box.style.borderRadius='10px';
+  box.style.left = start.x + 'px'; box.style.top = start.y + 'px'; box.style.background='linear-gradient(90deg,#06b6d4,#8b5cf6)'; box.style.color='#fff';
+  box.style.lineHeight='44px'; box.style.textAlign='center'; box.textContent = 'ciphertext →'; document.body.appendChild(box);
+  const total = Math.hypot(end.x - start.x, end.y - start.y);
+  const duration = Math.max(600, total*1.5); const startTime = performance.now();
+  const eveNode = nodes.find(n=>n.type==='eve');
+  function frame(now){
+    const t = Math.min(1,(now - startTime)/duration);
+    const nx = start.x + (end.x - start.x)*t; const ny = start.y + (end.y - start.y)*t; box.style.left=nx+'px'; box.style.top=ny+'px';
+    if (eveNode && $('toggleEve').checked){
+      const eveCenterX = rect.left + eveNode.x + 60;
+      if (nx > eveCenterX - 20 && nx < eveCenterX + 20) showBubble('Eve','Eve sniffing ciphertext (cannot decrypt)');
+    }
+    if (t < 1) requestAnimationFrame(frame); else { box.remove(); onArrive && onArrive(); }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* -------------------------
+   Helper UI wiring
+   ------------------------- */
+$('howBtn').addEventListener('click', ()=> $('modal').style.display='flex');
+$('closeModal').addEventListener('click', ()=> $('modal').style.display='none');
+
+/* initial pickers and hint */
+buildAlicePickers(); showBubble('Alice','Drag Alice & Bob from toolbox to the canvas');
+
+/* expose userMeasure for inline onclicks */
+window.userMeasure = userMeasure;
+
+/* END OF SCRIPT */
+</script>
+<script>
+  async function runExp1() {
+    let res = await fetch("/run/exp1");
+    let data = await res.json();
+    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+  }
+
+  async function runExp2() {
+    let res = await fetch("/run/exp2");
+    let data = await res.json();
+    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+  }
+</script>
+</body>
+</html>
+
+</body>
+</html>
